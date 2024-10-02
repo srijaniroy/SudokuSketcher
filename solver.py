@@ -2,98 +2,101 @@ import pygame
 import sys
 from copy import deepcopy
 
-class SudokuGrid:
+class SudokuBoard:
     def __init__(self):
         self.cells = [[None for _ in range(9)] for _ in range(9)]
-        self.blocks = [Block() for _ in range(9)]
-        self.lines = [Line() for _ in range(18)]
+        self.subgrids = [Subgrid() for _ in range(9)]
+        self.lines = [GridLine() for _ in range(18)]
 
         for row in range(9):
             for col in range(9):
-                blockIndex = int(col / 3) + 3 * int(row / 3)
-                verticalLineIndex = col
-                horizontalLineIndex = row + 9
-                newCell = Cell(self.blocks[blockIndex], self.lines[verticalLineIndex],
-                               self.lines[horizontalLineIndex], (row, col))
-                self.cells[row][col] = newCell
-                self.blocks[blockIndex].cells.append(newCell)
-                self.lines[verticalLineIndex].cells.append(newCell)
-                self.lines[horizontalLineIndex].cells.append(newCell)
+                subgrid_index = (col // 3) + 3 * (row // 3)
+                vertical_line_index = col
+                horizontal_line_index = row + 9
+                new_cell = Cell(self.subgrids[subgrid_index], self.lines[vertical_line_index],
+                                self.lines[horizontal_line_index], (row, col))
+                self.cells[row][col] = new_cell
+                self.subgrids[subgrid_index].cells.append(new_cell)
+                self.lines[vertical_line_index].cells.append(new_cell)
+                self.lines[horizontal_line_index].cells.append(new_cell)
 
-    def is_cell_valid(self, number, position, grid):
+    def is_valid(self, number, position, grid):
         cell = self.cells[position[0]][position[1]]
         return cell.is_valid(number, grid)
 
-    def solve_sudoku(self, grid):
-        global game_stopped
+    def solve(self, grid):
+        global is_stopped
         global grid_to_display
-        if game_stopped:
+        if is_stopped:
             return None
         grid_to_display = grid
-        process_input()
-        pygame.time.wait(wait_duration)
-        render_grid()
+        handle_input()
+        pygame.time.wait(wait_time)
+        render_board()
 
-        first_empty_cell = (-1, -1)
+        first_empty_cell = self.find_empty_cell(grid)
 
-        for i in range(9):
-            for j in range(9):
-                if grid[i][j] == 0:
-                    first_empty_cell = (i, j)
-                    break
-            if first_empty_cell[0] != -1:
-                break
-
-        if first_empty_cell[0] == -1:
+        if first_empty_cell is None:
             return grid
 
-        for number_to_try in range(1, 10):
-            if self.is_cell_valid(number_to_try, first_empty_cell, grid):
+        for num in range(1, 10):
+            if self.is_valid(num, first_empty_cell, grid):
                 new_grid = deepcopy(grid)
-                new_grid[first_empty_cell[0]][first_empty_cell[1]] = number_to_try
+                new_grid[first_empty_cell[0]][first_empty_cell[1]] = num
                 highlight_cell((125, 125, 125), first_empty_cell)
-                result = self.solve_sudoku(new_grid)
+                result = self.solve(new_grid)
                 if result:
                     return result
 
         return None
 
-class Block:
+    def find_empty_cell(self, grid):
+        for i in range(9):
+            for j in range(9):
+                if grid[i][j] == 0:
+                    return (i, j)
+        return None
+
+
+class Subgrid:
     def __init__(self):
         self.cells = []
 
+
 class Cell:
-    def __init__(self, block, vertical_line, horizontal_line, position):
-        self.block = block
+    def __init__(self, subgrid, vertical_line, horizontal_line, position):
+        self.subgrid = subgrid
         self.vertical_line = vertical_line
         self.horizontal_line = horizontal_line
         self.position = position
 
     def is_valid(self, number, grid):
-        for neighbor_cell in self.block.cells:
-            if number == grid[neighbor_cell.position[0]][neighbor_cell.position[1]]:
+        for neighbor in self.subgrid.cells:
+            if number == grid[neighbor.position[0]][neighbor.position[1]]:
                 return False
-        for neighbor_cell in self.vertical_line.cells:
-            if number == grid[neighbor_cell.position[0]][neighbor_cell.position[1]]:
+        for neighbor in self.vertical_line.cells:
+            if number == grid[neighbor.position[0]][neighbor.position[1]]:
                 return False
-        for neighbor_cell in self.horizontal_line.cells:
-            if number == grid[neighbor_cell.position[0]][neighbor_cell.position[1]]:
+        for neighbor in self.horizontal_line.cells:
+            if number == grid[neighbor.position[0]][neighbor.position[1]]:
                 return False
         return True
 
-class Line:
+
+class GridLine:
     def __init__(self):
         self.cells = []
 
-def process_input():
-    global light_color
-    global dark_color
+
+def handle_input():
+    global white_color
+    global black_color
     global grid_to_display
-    global current_selection
+    global selected_cell
     global highlight
-    global sudoku_values
-    global sudoku_grid
-    global game_stopped
+    global current_values
+    global sudoku_board
+    global is_stopped
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -101,31 +104,32 @@ def process_input():
 
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_d:
-                light_color, dark_color = dark_color, light_color
+                white_color, black_color = black_color, white_color
             if event.key == pygame.K_r:
-                sudoku_values = [[0 for _ in range(9)] for _ in range(9)]
-                grid_to_display = sudoku_values
-                game_stopped = True
+                current_values = [[0 for _ in range(9)] for _ in range(9)]
+                grid_to_display = current_values
+                is_stopped = True
             if event.key == pygame.K_SPACE:
-                game_stopped = False
-                sudoku_grid.solve_sudoku(sudoku_values)
+                is_stopped = False
+                sudoku_board.solve(current_values)
                 highlight = None
 
             for number in range(1, 10):
-                if event.key == getattr(pygame, f"K_{number}") and current_selection != (-1, -1):
-                    if sudoku_grid.is_cell_valid(number, current_selection, sudoku_values):
-                        sudoku_values[current_selection[0]][current_selection[1]] = number
-                        grid_to_display = sudoku_values
-                        current_selection = (-1, -1)
+                if event.key == getattr(pygame, f"K_{number}") and selected_cell != (-1, -1):
+                    if sudoku_board.is_valid(number, selected_cell, current_values):
+                        current_values[selected_cell[0]][selected_cell[1]] = number
+                        grid_to_display = current_values
+                        selected_cell = (-1, -1)
                         highlight = None
                     else:
-                        flash_cell(current_selection)
+                        flash_cell(selected_cell)
 
         if event.type == pygame.MOUSEBUTTONUP:
-            game_stopped = True
-            grid_to_display = sudoku_values
-            current_selection = get_cell_coordinates(event.pos)
-            highlight_cell(green_color, current_selection)
+            is_stopped = True
+            grid_to_display = current_values
+            selected_cell = get_cell_coordinates(event.pos)
+            highlight_cell(green_color, selected_cell)
+
 
 def highlight_cell(color, cell):
     global offset_height
@@ -134,20 +138,21 @@ def highlight_cell(color, cell):
     global highlight_color
 
     cell_size = int(width / 9)
-
     highlight = pygame.Rect(offset_width + cell[1] * cell_size, offset_height + cell[0] * cell_size, cell_size, cell_size)
     highlight_color = color
 
-def flash_cell(cell_number):
+
+def flash_cell(cell_position):
     for _ in range(5):
-        highlight_cell(red_color, cell_number)
-        render_grid()
+        highlight_cell(red_color, cell_position)
+        render_board()
         pygame.time.wait(10)
-        highlight_cell(light_color, cell_number)
-        render_grid()
+        highlight_cell(white_color, cell_position)
+        render_board()
         pygame.time.wait(10)
-    highlight_cell(green_color, cell_number)
-    render_grid()
+    highlight_cell(green_color, cell_position)
+    render_board()
+
 
 def get_cell_coordinates(pos):
     global offset_height
@@ -159,21 +164,12 @@ def get_cell_coordinates(pos):
 
     return x, y
 
-def get_screen_coordinates_for_cell(cell_position):
-    global offset_height
-    global offset_width
-    cell_size = int(width / 9)
 
-    x = offset_height + cell_size * cell_position[1] + int(cell_size / 4)
-    y = offset_width + cell_size * cell_position[0] + int(cell_size / 4)
-
-    return x, y
-
-def render_grid():
+def render_board():
     global offset_width
     global offset_height
 
-    screen.fill(light_color)
+    screen.fill(white_color)
 
     max_width = int(width / 9) * 9
     max_height = int(height / 9) * 9
@@ -185,47 +181,58 @@ def render_grid():
 
     for i in range(0, 10):
         intensity = 3 if i % 3 == 0 else 1
-        pygame.draw.line(screen, dark_color, (offset_width + int(width / 9) * i, offset_height), (offset_width + int(width / 9) * i, offset_height + max_height), intensity)
-        pygame.draw.line(screen, dark_color, (offset_width, offset_height + int(height / 9) * i), (offset_width + max_width, offset_height + int(height / 9) * i), intensity)
+        pygame.draw.line(screen, black_color, (offset_width + int(width / 9) * i, offset_height), (offset_width + int(width / 9) * i, offset_height + max_height), intensity)
+        pygame.draw.line(screen, black_color, (offset_width, offset_height + int(height / 9) * i), (offset_width + max_width, offset_height + int(height / 9) * i), intensity)
 
     font = pygame.font.Font("Quino.otf", int(0.1 * height))
 
     for i in range(9):
         for j in range(9):
             char_to_display = "" if str(grid_to_display[i][j]) == "0" else str(grid_to_display[i][j])
-            label = font.render(char_to_display, 1, dark_color)
-            screen.blit(label, get_screen_coordinates_for_cell((i, j)))
+            label = font.render(char_to_display, 1, black_color)
+            screen.blit(label, get_cell_screen_coordinates((i, j)))
 
     pygame.display.flip()
+
+
+def get_cell_screen_coordinates(cell_position):
+    global offset_height
+    global offset_width
+    cell_size = int(width / 9)
+
+    x = offset_height + cell_size * cell_position[1] + int(cell_size / 4)
+    y = offset_width + cell_size * cell_position[0] + int(cell_size / 4)
+
+    return x, y
+
 
 pygame.init()
 
 program_icon = pygame.image.load('icon1.png')
-
 pygame.display.set_icon(program_icon)
 
 with open("settings.txt") as settings_file:
     for line in settings_file:
         parts = line.split(" ")
         if parts[0] == "sleepTimeBetweenMoves":
-            wait_duration = int(parts[2])
+            wait_time = int(parts[2])
         if parts[0] == "resolution":
             size = width, height = int(parts[2]), int(parts[2])
 
-light_color = (255, 255, 255)
-dark_color = (0, 0, 0)
+white_color = (255, 255, 255)
+black_color = (0, 0, 0)
 red_color = (255, 0, 0)
 green_color = (0, 255, 0)
 highlight = None
-game_stopped = False
+is_stopped = False
 
 screen = pygame.display.set_mode(size)
 pygame.display.set_caption("Sudoku Solver by Tymscar")
 
-sudoku_grid = SudokuGrid()
-sudoku_values = [[0 for _ in range(9)] for _ in range(9)]
-grid_to_display = sudoku_values
+sudoku_board = SudokuBoard()
+current_values = [[0 for _ in range(9)] for _ in range(9)]
+grid_to_display = current_values
 
 while True:
-    process_input()
-    render_grid()
+    handle_input()
+    render_board()
