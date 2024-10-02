@@ -7,5 +7,5 @@ sleepTimeBetweenMoves = 0
 
 #Resolution
 #Width will be equal to height so only one of them has to be set
-#On a 1080 screen, around 700 is a good number
+#On a 1080 screen, 500 should be feasible
 resolution = 500
