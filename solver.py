@@ -227,7 +227,7 @@ highlight = None
 is_stopped = False
 
 screen = pygame.display.set_mode(size)
-pygame.display.set_caption("Sudoku Solver by Tymscar")
+pygame.display.set_caption("Sudoku Solver by Srijani Roy")
 
 sudoku_board = SudokuBoard()
 current_values = [[0 for _ in range(9)] for _ in range(9)]
